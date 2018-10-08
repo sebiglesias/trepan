@@ -1,18 +1,24 @@
 package trepan;
 
-import org.apache.spark.ml.Estimator;
+import org.apache.spark.ml.PredictionModel;
+import org.apache.spark.mllib.stat.KernelDensity;
 import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Encoder;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SparkSession;
 
-public class Oracle {
-    private Estimator estimator;
-    private Dataset<Row> dataSet;
+import java.util.List;
 
-    Oracle(Dataset<Row> dataSet, Estimator estimator) {
+class Oracle {
+    private PredictionModel model;
+    private Dataset<Object> dataSet;
+    private KernelDensity distributions;
+
+    Oracle(Dataset<Object> dataSet, PredictionModel model) {
         this.dataSet = dataSet;
-        this.estimator = estimator;
+        this.model = model;
+        this.distributions = new KernelDensity().setSample(this.dataSet.rdd()).setBandwidth(3.0);
+    }
+
+    List<Double> getLabels(Dataset set) {
+        return set.javaRDD().map(row -> model.predict(row)).collect();
     }
 
 }
