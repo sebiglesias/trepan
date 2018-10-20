@@ -2,9 +2,9 @@ import org.apache.spark.ml.classification.MultilayerPerceptronClassificationMode
 import org.apache.spark.ml.classification.MultilayerPerceptronClassifier;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.SparkSession;
-import trepan.Trepan;
+import javatrepan.Trepan;
 
-public class TrepanApp {
+public class JavaTrepanApp {
     public static void main(String[] args) {
         final String path = "src/main/resources/breastcancer.data";
 
