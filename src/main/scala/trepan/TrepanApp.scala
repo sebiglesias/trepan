@@ -6,18 +6,17 @@ import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 import org.apache.spark.sql.functions.udf
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 
-
+/** Main App that obtains a TREPAN tree out of a trained neural network */
 object TrepanApp extends App {
-  // Create a spark session with WARN logLevel
+  /** Create a spark session with WARN logLevel */
   val spark = SparkSession
     .builder()
     .appName("Trepan Scala App")
     .master("local")
     .getOrCreate()
-
   spark.sparkContext.setLogLevel("WARN")
 
-  // Read a csv
+  /** Read a csv with the data*/
   val csv: DataFrame = spark
     .read
     .format("csv")
@@ -70,6 +69,6 @@ object TrepanApp extends App {
   frame.printSchema()
   private val trepan = Trepan(Oracle(model), frame, 10, 10, 0.95)
 
-  private val node: Node = trepan.makeTree()
+  private val tree: Node = trepan.makeTree()
 
 }

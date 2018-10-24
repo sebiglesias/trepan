@@ -1,9 +1,6 @@
 package trepan
 
-
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.Row
-
 
 trait TrepanEstimator {
   def newValue(): Any

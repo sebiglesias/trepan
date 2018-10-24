@@ -1,27 +1,50 @@
 package trepan
 
 import org.apache.spark.sql.DataFrame
-
 import scala.math.log10
 import scala.collection.mutable.ListBuffer
-/*
- * Trepan tree Node
+
+/** Trepan tree Node
+ *
+ * @constructor Creates a nodes with a dataset, a nodetype (either Leaf or Internal), a reference to the oracle and
+ *              the constraints imposed by the trepan estimator (minSample, leafPurity, constraint)
+ * @param data Training examples that reach this node in the TREPAN decision tree
+ * @param nodeType Object representing if node is a Leaf or Internal (non-Leaf)
+ * @param treeReach Height of the node in the tree
+ * @param minSample Minimum sample needed for a node in the estimated decision tree
+ * @param oracle an Oracle class that represents a machine learning model used to obtain labels for query instances
+ * @param constraint
+ * @param leafPurity Percentage inherited by the TREPAN estimator of classes on one node to consider itself "pure"
  */
 case class Node(data: DataFrame, var nodeType: NodeType, treeReach: Int, minSample: Long, oracle: Oracle, constraint: Constraint, leafPurity: Double) {
 
-  // get column types from schema
+  /** get column types from the DataFrame schema */
   val columnTypes: SchemaType = new SchemaType(data.schema)
 
-  // Check if more instances on data are needed
-  val numToBeCreated: Long = minSample - dataSize()
+  /** Check if more instances on data are needed to fulfill with minSample required in a node */
+  val numToBeCreated: Long = minSample - data.count
   if (numToBeCreated > 0) {
+    /**
+      * As the size of the training examples (data) is not enough, queryInstances need to be created from data's
+      * column distributions and asking the oracle for their label
+      */
     var distributions: List[TrepanEstimator] = List.empty[TrepanEstimator]
     drawInstances(distributions, numToBeCreated, data.schema.fields.length: Long)
   }
 
-  // Assign node classLabel
+  /**
+    * SparkSQL allows to perform SQL-like queries on the DataFrame, this query obtains the frequency of labels in the
+    * sum of data and queryInstances
+    */
   private val labelCount: DataFrame = data.groupBy("label").count().orderBy("count")
 
+  /** Creates new instances (rows) from the training data's column distribution
+    *
+    * @param estimators
+    * @param numToBeCreated Amount of queryInstances to create
+    * @param numOfFeatures Amount of attributes (columns)
+    * @return a set of queryInstances in the form of a DataFrame
+    */
   private def drawInstances(estimators: List[TrepanEstimator], numToBeCreated: Long, numOfFeatures: Long): Option[DataFrame] = {
     var instances = ListBuffer()
     var num = 0
@@ -38,14 +61,10 @@ case class Node(data: DataFrame, var nodeType: NodeType, treeReach: Int, minSamp
     Some(data)
   }
 
-  def dataSize(): Long = {
-    data.count
-  }
-
   def constructTest(leafPurity: Double): Unit = {
     var proportion: Double = 1
-    if (dataSize() > 0) {
-      proportion = labelCount.first().getLong(1) / dataSize()
+    if (data.count > 0) {
+      proportion = labelCount.first().getLong(1) / data.count
     }
 
     if (proportion > leafPurity) nodeType = Leaf
@@ -88,6 +107,10 @@ case class Node(data: DataFrame, var nodeType: NodeType, treeReach: Int, minSamp
   }
 }
 
+/** Object used to identify a node type
+  *
+  * A Lead node is a node with no children, any node that is not a Leaf, will be considered an Internal node
+  */
 trait NodeType
 case object Leaf extends NodeType
 case object Internal extends NodeType
