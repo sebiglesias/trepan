@@ -26,14 +26,14 @@ object TrepanApp extends App {
     .load("src/main/resources/Iris.csv")
 
   // Transform csv
-  val toVec4 = udf[Vector, Double, Double, Double, Double] { (a, b, c, d) =>
+  val toVec4 = udf[Vector, Double, Double, Double, Int] { (a, b, c, d) =>
     Vectors.dense(a, b, c, d)
   }
 
-  val encodeLabel = udf[Double, String] {
-    case "Iris-setosa" => 0.0
-    case "Iris-versicolor" => 1.0
-    case "Iris-virginica" => 2.0
+  val encodeLabel = udf[Int, String] {
+    case "Iris-setosa" => 0
+    case "Iris-versicolor" => 1
+    case "Iris-virginica" => 2
   }
 
   private val dataSet: DataFrame = csv
@@ -66,7 +66,9 @@ object TrepanApp extends App {
   private val model: PipelineModel = pipeline.fit(split(0))
 
   // Trepan algorithm
-  private val trepan = Trepan(Oracle(model), csv, 10, 10)
+  private val frame: DataFrame = csv.withColumn("label", encodeLabel(csv("class"))).select("sepal-length", "sepal-width", "petal-length", "petal-width", "label")
+  frame.printSchema()
+  private val trepan = Trepan(Oracle(model), frame, 10, 10, 0.95)
 
   private val node: Node = trepan.makeTree()
 

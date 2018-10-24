@@ -16,7 +16,6 @@ case class NominalTrepanEstimator(column: DataFrame) extends TrepanEstimator {
   var accumulatedCounts: collection.mutable.Map[Any, Double] = collection.mutable.Map[Any, Double]().withDefaultValue(0)
   var numOfValues: Int = 0
 
-  column.show()
   // fill frequency and count
   column.foreach {
     u =>

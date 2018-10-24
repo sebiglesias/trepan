@@ -5,7 +5,7 @@ import org.apache.spark.sql.DataFrame
 
 case class Oracle(model: PipelineModel) {
   def getSamples(trainingSet: DataFrame, featureSet: DataFrame, minSample: Integer): DataFrame = {
-    trainingSet.show()
+//    trainingSet.show()
 //    trainingSet.rdd.map(row => row.)
 
     featureSet

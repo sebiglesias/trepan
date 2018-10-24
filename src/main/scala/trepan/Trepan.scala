@@ -4,22 +4,39 @@ import org.apache.spark.sql.DataFrame
 
 import scala.collection.immutable.Queue
 
-case class Trepan(oracle: Oracle, dataSet: DataFrame, minSample: Int, beamWidth: Integer) {
+/*
+ * Trepan class
+ *
+ * oracle
+ * dataSet
+ * minSample
+ * beamWidth: reach of the tree
+ * leafPurity: percentage of classes of the same class that make a node a leaf
+ */
+
+case class Trepan(oracle: Oracle, dataSet: DataFrame, minSample: Int, beamWidth: Int, leafPurity: Double) {
   /*
   Returns the root node of a decision tree
    */
   def makeTree(): Node = {
-    var queue = Queue[QueueNode]()
-    val root = Node(dataSet, Leaf, 1)
+    var queue = Queue[Node]()
     // Create more instances (= rows) if they are needed
-    root.drawSample(minSample, oracle)
+    val root = Node(dataSet, Leaf, 1, minSample, oracle, Constraint(), leafPurity)
+    queue = queue enqueue root
 
-    queue = queue enqueue QueueNode(root, dataSet, Constraint())
+    // current tree size
+    var treeSize: Int = 0
 
+    // current amount of nodes
+    var nodeCount: Int = 0
 
-    oracle.getSamples(dataSet, dataSet, minSample)
-//    while (queue.nonEmpty && treeSize < beamWidth) {
-//      val tuple = queue.dequeue._1
+    while (queue.nonEmpty && treeSize < beamWidth) {
+      val tuple = queue.dequeue
+      val node: Node = tuple._1
+      queue = tuple._2
+      nodeCount+=1
+      // split the node
+      node.constructTest(leafPurity)
 //      val examplesN = tuple(1)
 //      val constraintsN = tuple(2)
 
@@ -28,8 +45,8 @@ case class Trepan(oracle: Oracle, dataSet: DataFrame, minSample: Int, beamWidth:
       // use examplesN and calls to Oracle(contraintsN) to evaluate splits
 
 
-//    }
-    queue.dequeue._1.getNode()
+    }
+    root
   }
 }
 

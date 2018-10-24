@@ -1,31 +1,28 @@
 package trepan
 
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.types.{DecimalType, IntegerType, StringType, StructField}
 
+import scala.math.log10
 import scala.collection.mutable.ListBuffer
 /*
  * Trepan tree Node
  */
-case class Node(data: DataFrame, nodeType: NodeType, treeReach: Int) {
+case class Node(data: DataFrame, var nodeType: NodeType, treeReach: Int, minSample: Long, oracle: Oracle, constraint: Constraint, leafPurity: Double) {
 
-  // Use data to construct a model Mr of the distribution of instances covered by this node
-  def drawSample(minSample: Long, oracle: Oracle): Option[DataFrame] = {
-    val numToBeCreated: Long = minSample - dataSize()
-    if (numToBeCreated > 0) {
-      // TODO: Continue from here SEBIIIII
-      val estimators = data.schema.fields.map {
-        case StructField(name, IntegerType, _, _) => getNominalEstimator(data.groupBy(data.col(name)).count())
-        case StructField(name, StringType, _, _) => getNominalEstimator(data.groupBy(data.col(name)).count())
-        case StructField(name, DecimalType(), _, _) => getDiscreteEstimator(data.groupBy(data.col(name)).count())
-      }
-      drawInstances(estimators, numToBeCreated, data.schema.fields.length: Long)
-    } else {
-      None
-    }
+  // get column types from schema
+  val columnTypes: SchemaType = new SchemaType(data.schema)
+
+  // Check if more instances on data are needed
+  val numToBeCreated: Long = minSample - dataSize()
+  if (numToBeCreated > 0) {
+    var distributions: List[TrepanEstimator] = List.empty[TrepanEstimator]
+    drawInstances(distributions, numToBeCreated, data.schema.fields.length: Long)
   }
 
-  private def drawInstances(estimators: Array[TrepanEstimator], numToBeCreated: Long, numOfFeatures: Long): Option[DataFrame] = {
+  // Assign node classLabel
+  private val labelCount: DataFrame = data.groupBy("label").count().orderBy("count")
+
+  private def drawInstances(estimators: List[TrepanEstimator], numToBeCreated: Long, numOfFeatures: Long): Option[DataFrame] = {
     var instances = ListBuffer()
     var num = 0
     var feat = 0
@@ -45,21 +42,52 @@ case class Node(data: DataFrame, nodeType: NodeType, treeReach: Int) {
     data.count
   }
 
-  def getNominalEstimator(col: DataFrame): TrepanEstimator = {
-    NominalTrepanEstimator(col)
+  def constructTest(leafPurity: Double): Unit = {
+    var proportion: Double = 1
+    if (dataSize() > 0) {
+      proportion = labelCount.first().getLong(1) / dataSize()
+    }
+
+    if (proportion > leafPurity) nodeType = Leaf
+    else {
+      // pick feature with best infoGain
+      // per each attribute (column), calculate infoGain
+      val columns = data.columns
+      val infoGains = columns.foreach(columnName => {
+        infoGainOfAttribute(data, columnName)
+      })
+
+      // pick attribute with highest infoGain
+
+      // if infoGain == 0 => make leaf
+      // else splitNode using that attribute
+    }
   }
 
-  def getDiscreteEstimator(col: DataFrame): TrepanEstimator = {
-    DiscreteTrepanEstimator(col)
+  // equivalent of computeInfoGain
+  private def infoGainOfAttribute(instances: DataFrame, columnName: String): Double = {
+    var infoGain = getEntropy(instances)
+    splitData(instances, columnName, 0)
+    infoGain
+  }
+
+  private def getEntropy(instances: DataFrame): Double = {
+    val classCounts = instances.groupBy("label").count().orderBy("count")
+    var entropy: Double = 0
+//    classCounts.map( row => {
+//      val classCount = row.getInt(1)
+//      if (classCount > 0) entropy -=  classCount * classCount / (log10(classCount) / log10(2))
+//    })
+    val numberOfInstances = instances.count()
+    entropy /= numberOfInstances
+    entropy + (log10(numberOfInstances) / log10(2))
+  }
+
+  private def splitData(instances: DataFrame, columnName: String, value: Integer) : List[DataFrame] = {
+    List(instances)
   }
 }
 
 trait NodeType
 case object Leaf extends NodeType
 case object Internal extends NodeType
-
-case class QueueNode(node: Node, trainingExamples: DataFrame, constraint: Constraint) {
-  def getNode(): Node = {
-    node
-  }
-}
